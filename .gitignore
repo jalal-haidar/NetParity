@@ -1,0 +1,10 @@
+*.txt
+*.bin
+TempTracker.ps1
+verify_*.ps1
+verification_log.txt
+final_verification.txt
+direct_parity_verification.txt
+testfile.bin
+.gemini/
+.agents/
