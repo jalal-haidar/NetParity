@@ -1,6 +1,8 @@
-# 🚀 Internet Speed Tracker (Task Manager Parity)
+# 🚀 NetParity (Task Manager Parity)
 
 A lightweight, high-precision Windows floating UI that tracks CPU, RAM, and Network speeds in real-time. Designed to match the **Windows Task Manager Performance Tab** exactly.
+
+[**⬇️ Download NetParity.exe (Latest Release)**](https://github.com/jalal-haidar/NetParity/releases/latest/download/NetParity.exe)
 
 
 ## 🎯 Why NetParity? (The Problem We Solve)
