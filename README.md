@@ -2,7 +2,6 @@
 
 A lightweight, high-precision Windows floating UI that tracks CPU, RAM, and Network speeds in real-time. Designed to match the **Windows Task Manager Performance Tab** exactly.
 
-![SpeedTracker Preview](https://via.placeholder.com/220x100.png?text=SpeedTracker+UI) *[Replace with real screenshot]*
 
 ## 🎯 Why NetParity? (The Problem We Solve)
 
