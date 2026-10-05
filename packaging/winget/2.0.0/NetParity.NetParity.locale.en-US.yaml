@@ -1,0 +1,39 @@
+# Created for the NetParity winget-pkgs submission.
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+
+PackageIdentifier: NetParity.NetParity
+PackageVersion: 2.0.0
+PackageLocale: en-US
+Publisher: NetParity
+PublisherUrl: https://github.com/jalal-haidar/NetParity
+PublisherSupportUrl: https://github.com/jalal-haidar/NetParity/issues
+Author: jalal-haidar
+PackageName: NetParity
+PackageUrl: https://github.com/jalal-haidar/NetParity
+License: MIT
+LicenseUrl: https://github.com/jalal-haidar/NetParity/blob/main/LICENSE
+Copyright: Copyright (c) 2026 jalal-haidar
+ShortDescription: "See why it lagged: CPU, RAM, network, ping and jitter in one glance"
+Description: |-
+  NetParity is a tiny always-on-top overlay that shows CPU, RAM, network throughput, ping, jitter and packet loss at a glance.
+
+  Bandwidth does not predict stutter. A 4K video will not drop frames on a fast connection when ping and jitter are stable, and a laggy game will not be fixed by more bandwidth when round-trip time is swinging. NetParity shows all of them together so the cause of a stutter is visible immediately, without alt-tabbing away from whatever you were doing.
+
+  CPU and RAM are sampled four times a second, throughput continuously, and latency once a second using ICMP with a TCP-handshake fallback when ICMP is filtered.
+
+  Everything is computed locally. The only network traffic is the ping probe to the target you configure, and turning the latency display off stops those probes entirely.
+Moniker: netparity
+Tags:
+- system
+- performance
+- monitor
+- network
+- latency
+- ping
+- jitter
+- cpu
+- ram
+- task-manager
+- overlay
+ManifestType: defaultLocale
+ManifestVersion: 1.12.0
