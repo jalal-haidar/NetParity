@@ -1,0 +1,32 @@
+# Created for the NetParity winget-pkgs submission.
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+
+PackageIdentifier: NetParity.NetParity
+PackageVersion: 2.0.0
+InstallerType: portable
+UpgradeBehavior: install
+ReleaseDate: 2026-10-05
+
+Platform:
+- Windows.Desktop
+
+MinimumOSVersion: 10.0.17763
+
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/jalal-haidar/NetParity/releases/download/v2.0.0/NetParity.exe
+  # Filled in by tools/Update-WingetManifest.ps1 from the published release asset.
+  # A placeholder here fails validation, and would ship a binary winget cannot verify.
+  InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+
+# NetParity needs no elevation: it samples system counters and writes only under
+# %AppData%, so nothing is installed outside the user's own profile.
+ElevationRequirement: elevationProhibited
+
+# The exe is downloaded directly, so the alias is declared with Commands rather than
+# PortableCommandAlias, which only applies to a nested file inside an archive.
+Commands:
+- netparity
+
+ManifestType: installer
+ManifestVersion: 1.12.0
