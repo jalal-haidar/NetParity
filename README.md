@@ -73,6 +73,8 @@ physical link underneath it.
 - **Double-click** to hide or show it.
 - **`Ctrl` + `Alt` + `N`** toggles visibility from anywhere.
 - **Right-click** for units, ping target, start-with-Windows, reset position, and exit.
+- **System tray icon** to show or hide the overlay, reset its position, or exit. The tray is
+  the way back in if `Ctrl` + `Alt` + `N` turns out to be taken by another application.
 - **`Esc`** exits.
 
 Settings live in `%AppData%\NetParity\settings.json`.
@@ -82,6 +84,9 @@ Settings live in `%AppData%\NetParity\settings.json`.
 Everything is computed locally and nothing leaves your machine. The only network traffic
 is the ping probe to the target you configure, once per second. There is no telemetry,
 no update check, and no account.
+
+Turning **Show ping and jitter** off in the context menu stops the probes entirely rather
+than just hiding the number, so nothing is sent at all while it is off.
 
 ## Building from source
 
@@ -137,7 +142,7 @@ Honest list of what this does not do:
   was never implemented. Aggregate only, for now.
 - No disk, GPU or temperature metrics.
 - No sparkline history.
-- No tray icon and no auto-update.
+- No auto-update.
 - No localisation; Windows display scaling is respected via per-monitor v2 DPI awareness.
 
 ## License

@@ -23,32 +23,66 @@ public sealed class MetricsService : IDisposable
     private readonly CpuSampler _cpu = new();
     private readonly RamSampler _ram = new();
     private readonly NetworkSampler _network = new();
-    private readonly LatencySampler? _latency;
+    private readonly LatencySampler _latency;
     private readonly LatencyStatsTracker _latencyStats = new();
     private readonly Lock _latencyGate = new();
-    private readonly SpeedUnit _unitMode;
 
     private CancellationTokenSource? _cancellation;
     private Task? _loop;
+    private Task? _probe;
+    private volatile SpeedUnit _unitMode;
+    private volatile bool _latencyEnabled;
+    private volatile bool _disposed;
     private int _probing;
     private long _nextProbeTimestamp;
+    private long _probeCount;
     private LatencyStats _latestLatency = LatencyStats.Unavailable;
 
-    public MetricsService(SpeedUnit unitMode = SpeedUnit.Auto, string? latencyHost = null, bool enableLatency = true)
+    public MetricsService(SpeedUnit unitMode = SpeedUnit.Auto, string? latencyHost = null, bool latencyEnabled = true)
     {
         _unitMode = unitMode;
-        _latency = enableLatency ? new LatencySampler() : null;
-        _latency?.SetTarget(latencyHost ?? "1.1.1.1", 443);
+        _latencyEnabled = latencyEnabled;
+        _latency = new LatencySampler();
+        _latency.SetTarget(latencyHost ?? "1.1.1.1", 443);
     }
 
     public event EventHandler<SystemMetrics>? MetricsUpdated;
 
     public bool CpuAvailable => _cpu.IsAvailable;
 
-    public void SetLatencyTarget(string host, int port) => _latency?.SetTarget(host, port);
+    /// <summary>
+    /// How throughput is presented. Settable at any time, because the alternative was
+    /// tearing down and rebuilding this service from the UI thread just to change a label.
+    /// </summary>
+    public SpeedUnit UnitMode
+    {
+        get => _unitMode;
+        set => _unitMode = value;
+    }
+
+    /// <summary>
+    /// Whether latency probes are sent. Turning this off stops the probes entirely rather
+    /// than merely hiding the result, so a user who switches the overlay off is not still
+    /// generating traffic to a third party.
+    /// </summary>
+    public bool LatencyEnabled
+    {
+        get => _latencyEnabled;
+        set => _latencyEnabled = value;
+    }
+
+    /// <summary>
+    /// Number of latency probes started. Exposed so tests can assert that nothing is being
+    /// sent, which is otherwise impossible to verify without capturing packets.
+    /// </summary>
+    public long ProbeCount => Interlocked.Read(ref _probeCount);
+
+    public void SetLatencyTarget(string host, int port) => _latency.SetTarget(host, port);
 
     public void Start()
     {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
         if (_loop is not null)
         {
             return;
@@ -66,8 +100,7 @@ public sealed class MetricsService : IDisposable
         {
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
             {
-                var metrics = Sample();
-                MetricsUpdated?.Invoke(this, metrics);
+                MetricsUpdated?.Invoke(this, Sample());
                 BeginLatencyProbe(cancellationToken);
             }
         }
@@ -84,7 +117,7 @@ public sealed class MetricsService : IDisposable
         LatencyStats latency;
         lock (_latencyGate)
         {
-            latency = _latestLatency;
+            latency = _latencyEnabled ? _latestLatency : LatencyStats.Unavailable;
         }
 
         return new SystemMetrics
@@ -110,7 +143,7 @@ public sealed class MetricsService : IDisposable
     /// </remarks>
     private void BeginLatencyProbe(CancellationToken cancellationToken)
     {
-        if (_latency is null)
+        if (!_latencyEnabled || _disposed)
         {
             return;
         }
@@ -131,30 +164,21 @@ public sealed class MetricsService : IDisposable
             ref _nextProbeTimestamp,
             now + (Stopwatch.Frequency * LatencyProbeIntervalMs / 1000));
 
-        _ = Task.Run(async () =>
+        Interlocked.Increment(ref _probeCount);
+
+        // The task is retained so Dispose can wait for it. Without that, disposal raced
+        // the probe into a disposed Ping.
+        _probe = Task.Run(async () =>
         {
             try
             {
                 var reading = await _latency.MeasureAsync(LatencyTimeoutMs, cancellationToken).ConfigureAwait(false);
-                var stats = _latencyStats.Record(
-                    reading is not null,
-                    reading?.RoundTripMs,
-                    _latency.Host,
-                    reading?.Method ?? LatencyProbeMethod.None);
-
-                lock (_latencyGate)
-                {
-                    _latestLatency = stats;
-                }
+                Record(reading is not null, reading?.RoundTripMs, reading?.Method ?? LatencyProbeMethod.None);
             }
             catch (Exception)
             {
                 // A failed probe reports as loss, which is itself useful signal.
-                var stats = _latencyStats.Record(false, null, _latency.Host, LatencyProbeMethod.None);
-                lock (_latencyGate)
-                {
-                    _latestLatency = stats;
-                }
+                Record(succeeded: false, roundTripMs: null, LatencyProbeMethod.None);
             }
             finally
             {
@@ -163,21 +187,49 @@ public sealed class MetricsService : IDisposable
         }, CancellationToken.None);
     }
 
+    private void Record(bool succeeded, double? roundTripMs, LatencyProbeMethod method)
+    {
+        var stats = _latencyStats.Record(succeeded, roundTripMs, _latency.Host, method);
+
+        lock (_latencyGate)
+        {
+            _latestLatency = stats;
+        }
+    }
+
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _cancellation?.Cancel();
 
-        try
-        {
-            _loop?.Wait(TimeSpan.FromSeconds(2));
-        }
-        catch (AggregateException)
-        {
-            // Loop was cancelled mid-await.
-        }
+        WaitFor(_loop);
+        // Wait for the in-flight probe before disposing the sampler it is using.
+        WaitFor(_probe);
 
         _cancellation?.Dispose();
         _network.Dispose();
-        _latency?.Dispose();
+        _latency.Dispose();
+    }
+
+    private static void WaitFor(Task? task)
+    {
+        if (task is null)
+        {
+            return;
+        }
+
+        try
+        {
+            task.Wait(TimeSpan.FromSeconds(3));
+        }
+        catch (AggregateException)
+        {
+            // Loop or probe was cancelled mid-await.
+        }
     }
 }

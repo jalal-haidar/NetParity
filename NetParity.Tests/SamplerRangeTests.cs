@@ -88,7 +88,7 @@ public sealed class SamplerRangeTests
     [TestMethod]
     public void MetricsServicePublishesSnapshotsWithinBounds()
     {
-        using var service = new MetricsService(enableLatency: false);
+        using var service = new MetricsService(latencyEnabled: false);
         using var completed = new ManualResetEventSlim(false);
 
         SystemMetrics? latest = null;
@@ -111,7 +111,7 @@ public sealed class SamplerRangeTests
     [TestMethod]
     public void MetricsServiceStartsOnlyOnce()
     {
-        using var service = new MetricsService(enableLatency: false);
+        using var service = new MetricsService(latencyEnabled: false);
         var count = 0;
 
         service.MetricsUpdated += (_, _) => Interlocked.Increment(ref count);
@@ -127,7 +127,7 @@ public sealed class SamplerRangeTests
     [TestMethod]
     public void DisposedServiceStopsPublishing()
     {
-        var service = new MetricsService(enableLatency: false);
+        var service = new MetricsService(latencyEnabled: false);
         var count = 0;
 
         service.MetricsUpdated += (_, _) => Interlocked.Increment(ref count);

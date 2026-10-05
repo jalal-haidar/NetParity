@@ -25,10 +25,12 @@ public partial class MainWindow : Window
 
     private readonly AppSettings _settings;
     private readonly LatencyHealth _health = new();
+    private readonly System.Windows.Forms.NotifyIcon _tray;
 
-    private MetricsService? _metrics;
+    private MetricsService _metrics;
     private HwndSource? _hotkeySource;
     private bool _hotkeyRegistered;
+    private bool _hotkeyWarningShown;
 
     public MainWindow()
     {
@@ -36,6 +38,10 @@ public partial class MainWindow : Window
 
         _settings = SettingsStore.Load();
         ApplySettings();
+
+        _metrics = new MetricsService(_settings.UnitMode, _settings.LatencyHost, _settings.ShowLatency);
+
+        _tray = BuildTrayIcon();
 
         Loaded += OnLoaded;
         Closing += OnClosing;
@@ -45,7 +51,6 @@ public partial class MainWindow : Window
     {
         PlaceWindow();
 
-        _metrics = new MetricsService(_settings.UnitMode, _settings.LatencyHost, _settings.ShowLatency);
         _metrics.MetricsUpdated += OnMetricsUpdated;
         _metrics.Start();
 
@@ -58,14 +63,73 @@ public partial class MainWindow : Window
         CapturePosition();
         SettingsStore.Save(_settings);
 
-        if (_metrics is not null)
-        {
-            _metrics.MetricsUpdated -= OnMetricsUpdated;
-            _metrics.Dispose();
-            _metrics = null;
-        }
+        _metrics.MetricsUpdated -= OnMetricsUpdated;
+        _metrics.Dispose();
 
         UnregisterHotKey();
+
+        _tray.Visible = false;
+        _tray.Dispose();
+    }
+
+    /// <summary>
+    /// The tray icon is the recovery path, not a convenience. Without it, a user who hides
+    /// the overlay by double-clicking and then finds the hotkey is taken by another
+    /// application has no way back to the window short of Task Manager.
+    /// </summary>
+    private System.Windows.Forms.NotifyIcon BuildTrayIcon()
+    {
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Show or hide", null, (_, _) => ToggleVisibility());
+        menu.Items.Add("Reset position", null, (_, _) => Dispatcher.Invoke(ResetPosition));
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        menu.Items.Add("Exit", null, (_, _) => Close());
+
+        var icon = new System.Windows.Forms.NotifyIcon
+        {
+            Text = "NetParity",
+            Icon = LoadIcon(),
+            ContextMenuStrip = menu,
+            Visible = true
+        };
+
+        icon.DoubleClick += (_, _) => ToggleVisibility();
+        return icon;
+    }
+
+    private static System.Drawing.Icon LoadIcon()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var resource = Array.Find(
+            assembly.GetManifestResourceNames(),
+            name => name.EndsWith("NetParity.ico", StringComparison.OrdinalIgnoreCase));
+
+        if (resource is not null)
+        {
+            using var stream = assembly.GetManifestResourceStream(resource);
+            if (stream is not null)
+            {
+                return new System.Drawing.Icon(stream);
+            }
+        }
+
+        return System.Drawing.SystemIcons.Application;
+    }
+
+    private void WarnHotkeyUnavailable()
+    {
+        if (_hotkeyWarningShown)
+        {
+            return;
+        }
+
+        _hotkeyWarningShown = true;
+
+        _tray.ShowBalloonTip(
+            5000,
+            "NetParity",
+            "Ctrl+Alt+N is already claimed by another application. Use the tray icon to hide or show NetParity.",
+            System.Windows.Forms.ToolTipIcon.Warning);
     }
 
     private void PlaceWindow()
@@ -204,11 +268,10 @@ public partial class MainWindow : Window
         _settings.ShowLatency = ShowLatencyItem.IsChecked;
         SettingsStore.Save(_settings);
 
-        if (_settings.ShowLatency)
-        {
-            // Latency was sampled continuously in the background; it just was not drawn.
-            _metrics?.SetLatencyTarget(_settings.LatencyHost, _settings.LatencyPort);
-        }
+        // This now genuinely starts and stops probing. Previously it only flipped a
+        // drawing flag, so leaving the overlay off still sent a packet per second to a
+        // third party while claiming in the README that it had stopped.
+        _metrics.LatencyEnabled = _settings.ShowLatency;
     }
 
     private void OnUnitsAuto(object sender, RoutedEventArgs e) => SetUnitMode(SpeedUnit.Auto);
@@ -223,16 +286,9 @@ public partial class MainWindow : Window
         SettingsStore.Save(_settings);
         SyncMenuState();
 
-        // Unit mode is baked into the sampler, so it needs a fresh service.
-        if (_metrics is not null)
-        {
-            _metrics.MetricsUpdated -= OnMetricsUpdated;
-            _metrics.Dispose();
-        }
-
-        _metrics = new MetricsService(mode, _settings.LatencyHost, _settings.ShowLatency);
-        _metrics.MetricsUpdated += OnMetricsUpdated;
-        _metrics.Start();
+        // Unit mode is a plain property now. It used to require disposing and rebuilding
+        // the whole service from the UI thread to change three labels.
+        _metrics.UnitMode = mode;
     }
 
     private void OnSetLatencyTarget(object sender, RoutedEventArgs e)
@@ -276,11 +332,13 @@ public partial class MainWindow : Window
         {
             _settings.LatencyHost = input.Text.Trim();
             SettingsStore.Save(_settings);
-            _metrics?.SetLatencyTarget(_settings.LatencyHost, _settings.LatencyPort);
+            _metrics.SetLatencyTarget(_settings.LatencyHost, _settings.LatencyPort);
         }
     }
 
-    private void OnResetPosition(object sender, RoutedEventArgs e)
+    private void OnResetPosition(object sender, RoutedEventArgs e) => ResetPosition();
+
+    private void ResetPosition()
     {
         _settings.WindowLeft = -1;
         _settings.WindowTop = -1;
@@ -365,6 +423,13 @@ public partial class MainWindow : Window
         _hotkeySource = HwndSource.FromHwnd(handle);
         _hotkeySource?.AddHook(OnHotKey);
         _hotkeyRegistered = RegisterHotKey(handle, ToggleHotkeyId, modifiers, virtualKey);
+
+        if (!_hotkeyRegistered)
+        {
+            // Another application already owns Ctrl+Alt+N, which is common. Say so rather
+            // than failing silently and leaving the user unable to find the window.
+            Dispatcher.BeginInvoke(WarnHotkeyUnavailable);
+        }
     }
 
     private void UnregisterHotKey()
