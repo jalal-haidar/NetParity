@@ -4,7 +4,74 @@ Date: 2026-10-05 · Branch: `csharp-rewrite` (uncommitted) · Base: `main` = Pow
 
 ---
 
+## Progress
+
+Committed as `62235f8` "Rewrite in C# with correct metrics, latency, and a real release pipeline".
+
+### Done
+
+- [x] Restructured into `NetParity.Core` (logic) / `NetParity` (WPF) / `NetParity.Tests`.
+      Sampling code has no UI dependency, so it is directly testable.
+- [x] Fixed RAM parity: was `dwMemoryLoad` (commit charge), now `(total - available) / total`.
+- [x] Fixed CPU parity: was `% Processor Utility` clamped at 100, now non-idle processor time
+      via `GetSystemTimes`. Also removed a package dependency.
+- [x] Fixed decimal units (was `mbps * 1024`), adapter re-enumeration, and baseline re-priming.
+- [x] Removed the bogus RAM fallback that read a GC threshold as free memory.
+- [x] Collapsed three unsynchronised timers into one sampling loop with one immutable snapshot.
+- [x] Latency wedge: ping, jitter, packet loss, ICMP with TCP-handshake fallback, health grading.
+- [x] Settings persistence, position memory, `Ctrl+Alt+N` toggle, ping target, unit modes, About.
+- [x] Self-contained single-file publish profile; icon; per-monitor v2 DPI manifest.
+- [x] CI that verifies the artifact is genuinely single-file and runtime-independent.
+- [x] Release workflow with optional Authenticode signing and checksum.
+- [x] 55 tests, including parity cross-checks.
+- [x] Removed the PowerShell prototype and stale framework-dependent binary.
+- [x] Rewrote README: removed the "run the .ps1" instructions and the unshipped per-process claim.
+
+### Measured
+
+| | Before | After |
+|---|---|---|
+| Steady-state CPU | 27% of one core | ~1.2% of one core |
+| Working set | 113 MB, growing | ~44 MB |
+
+The CPU regression was self-inflicted: the latency probe fired on every 250 ms sample instead of
+once a second. Found by measuring, not by reading the code.
+
+### Blocked / cannot complete here
+
+- **Self-contained publish could not be run locally.** This machine's NuGet feed is offline and
+  the win-x64 runtime packs are absent. CI has network access and will exercise it.
+- **The GUI could not be launched on this machine.** App Control policy (0x800711C7) blocks
+  unsigned binaries in this workspace; it blocks the previously committed `NetParity.exe` too.
+  This is precisely the problem code signing solves, and it is why signing is wired into the
+  release workflow rather than left as a manual step. Metric behaviour is covered by the test
+  suite, which runs in the test host and drives every sampler live.
+
+### Remaining, in priority order
+
+1. **Sign the binary.** Obtain an Authenticode cert, add `CERT_PFX_BASE64` and `CERT_PASSWORD`
+   secrets, cut a tag. Nothing else on this list matters as much; SmartScreen is the largest
+  single cause of abandoned installs.
+2. **Verify CI green on a first push** — this is the first time the single-file publish path
+   has ever executed.
+3. **Record the 15-second demo GIF.** Highest-impact marketing item. Script: saturate upload,
+  show throughput flat, show ping and jitter turn amber/red. That single clip is the pitch.
+4. **Submit the winget manifest** upstream to replace the placeholder SHA256.
+5. **Launch**: Show HN (the ICMP-to-TCP fallback is a genuine technical hook), r/gaming,
+   r/windows, r/programming.
+6. **Per-process network attribution** (wedge A), via `GetExtendedTcpTable`. This is the feature
+   the old README promised and never had.
+7. **ISP truth-check** (wedge C) as a follow-up campaign.
+8. Lower priority: tray icon, auto-update, sparkline history, localisation.
+
+---
+
 ## Part 1 — How much work is remaining?
+
+> Historical. This was the original assessment, written before commit `62235f8`. Every item in
+> it has since been addressed except code signing, which needs a certificate you have to buy.
+> See **Progress** above for the current state.
+
 
 ### The headline finding
 
