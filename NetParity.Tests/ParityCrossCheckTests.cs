@@ -42,30 +42,41 @@ public sealed class ParityCrossCheckTests
         // (total - available) / total is the formula Task Manager uses. Summing every
         // process working set is an independent estimate of the same quantity.
         //
-        // The two do not have to match, and in one direction they cannot: a shared page
-        // mapped by fifty processes is counted fifty times, so the working-set sum
-        // over-counts and can legitimately exceed physical memory. What must hold is that
-        // the processes account for a real share of installed memory, and that the
-        // over-count stays bounded rather than exploding.
+        // The two are not equal and must not be. A shared page mapped by many processes
+        // is counted once per process, so the working-set sum over-counts; kernel memory
+        // and standby cache belong to no process, so it also under-counts those. Measured
+        // ratios of working sets to in-use memory are 1.2x on an idle runner and 1.5x on
+        // a loaded workstation, so the useful assertion is that they stay in the same
+        // neighbourhood, not that they match.
+        //
+        // This is what catches a regression to GlobalMemoryStatusEx.dwMemoryLoad: that
+        // field is commit charge, which on a machine under paging reads 169% of physical
+        // memory while in-use physical memory reads 84%.
         var reading = new RamSampler().Read();
         var workingSets = SumWorkingSets();
         var totalPhysical = (double)reading.TotalBytes;
+        var usedPhysical = totalPhysical - reading.AvailableBytes;
 
         Assert.IsTrue(reading.TotalBytes > 0, "Total physical memory reported as 0.");
         Assert.IsTrue(reading.AvailableBytes < reading.TotalBytes, "All physical memory reported as available.");
         Assert.IsTrue(workingSets > 0, "No process working sets were readable.");
+        Assert.IsTrue(usedPhysical > 0, "No physical memory reported as in use.");
 
         Assert.IsTrue(
-            workingSets >= totalPhysical * 0.25,
-            $"Process working sets account for only {workingSets / totalPhysical * 100d:F1}% of physical " +
-            $"memory, which does not reconcile with {reading.UsedPercent:F1}% reported in use.");
+            reading.UsedPercent is > 0 and < 100,
+            $"Implausible RAM usage {reading.UsedPercent:F1}%. Commit charge on a machine under " +
+            "paging reads well above 100%, so this is the assertion that catches a regression to dwMemoryLoad.");
+
+        var ratio = workingSets / usedPhysical;
+
+        Assert.IsTrue(
+            ratio is >= 0.8 and <= 3.0,
+            $"Working sets are {ratio:F2}x in-use memory, which is outside the expected 0.8x-3.0x band.");
 
         Assert.IsTrue(
             workingSets <= totalPhysical * 2,
             $"Process working sets ({workingSets / 1048576d:F0} MB) exceed twice physical memory " +
             $"({reading.TotalBytes / 1048576d:F0} MB), so the enumeration is likely wrong.");
-
-        Assert.IsTrue(reading.UsedPercent is > 0 and < 100, $"Implausible RAM usage {reading.UsedPercent:F1}%.");
     }
 
     private static long SumWorkingSets()
