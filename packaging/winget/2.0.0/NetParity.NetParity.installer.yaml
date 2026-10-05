@@ -15,9 +15,7 @@ MinimumOSVersion: 10.0.17763
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/jalal-haidar/NetParity/releases/download/v2.0.0/NetParity.exe
-  # Filled in by tools/Update-WingetManifest.ps1 from the published release asset.
-  # A placeholder here fails validation, and would ship a binary winget cannot verify.
-  InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+  InstallerSha256: 3C1C308E490A4C38BA32D1F38632AA742CA640809C08D1FD2FA1CE3513B958E9
 
 # NetParity needs no elevation: it samples system counters and writes only under
 # %AppData%, so nothing is installed outside the user's own profile.
