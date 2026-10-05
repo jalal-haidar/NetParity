@@ -1,10 +1,30 @@
-*.txt
+# Build output
+bin/
+obj/
+publish/
+[Dd]ebug/
+[Rr]elease/
+*.user
+*.suo
+.vs/
+
+# Test output
+[Tt]est[Rr]esults/
+*.trx
+*.coverage
+coverage*.xml
+
+# Icons and binaries produced by ad-hoc tooling
 *.bin
+
+# Verification scratch files from earlier iterations
 TempTracker.ps1
 verify_*.ps1
 verification_log.txt
 final_verification.txt
 direct_parity_verification.txt
 testfile.bin
+
+# Tooling
 .gemini/
 .agents/

@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>NetParity.Core</RootNamespace>
+    <AssemblyName>NetParity.Core</AssemblyName>
+    <Description>Metric sampling for NetParity.</Description>
+  </PropertyGroup>
+
+</Project>

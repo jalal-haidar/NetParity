@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, for example v2.0.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish release
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test
+        run: dotnet test NetParity.Tests\NetParity.Tests.csproj -c Release
+
+      - name: Publish
+        run: >
+          dotnet publish NetParity\NetParity.csproj
+          -p:PublishProfile=win-x64
+          -c Release
+
+      # Authenticode signing is not optional for a public download. Without it, Windows
+      # SmartScreen shows an "unknown publisher" wall on first run, which is the single
+      # largest source of abandoned installs. Configure these repository secrets:
+      #   CERT_PFX_BASE64   base64 of the signing certificate, without a password
+      #   CERT_PASSWORD     certificate password
+      # The step warns rather than fails when the secrets are absent, so forks can still
+      # cut a release, but an unsigned artifact is called out loudly below.
+      - name: Sign
+        shell: pwsh
+        env:
+          CERT_PFX_BASE64: ${{ secrets.CERT_PFX_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: |
+          $exe = Join-Path $PWD 'publish\NetParity.exe'
+
+          if (-not $env:CERT_PFX_BASE64) {
+            Write-Warning 'No signing certificate configured: releasing an UNSIGNED binary.'
+            Write-Warning 'Expect a SmartScreen warning on download for every user.'
+            exit 0
+          }
+
+          $pfx = [System.IO.Path]::GetTempFileName()
+          try {
+            [System.IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX_BASE64))
+
+            $secure = ConvertTo-SecureString $env:CERT_PASSWORD -AsPlainText -Force
+            $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfx, $secure)
+
+            $store = [System.Security.Cryptography.X509Certificates.X509Store]::new('My', 'CurrentUser')
+            $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+            $store.Add($cert)
+            $store.Close()
+
+            Set-AuthenticodeSignature -FilePath $exe -Certificate $cert `
+              -HashAlgorithm SHA256 -TimestampServer 'http://timestamp.digicert.com' -ErrorAction Stop | Out-Null
+
+            $check = Get-AuthenticodeSignature $exe
+            Write-Host "Signature status: $($check.Status)"
+
+            if ($check.Status -ne 'Valid') {
+              throw "Signature did not validate: $($check.Status)"
+            }
+          }
+          finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Compute checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash publish\NetParity.exe -Algorithm SHA256).Hash
+          "SHA256 of NetParity.exe: $hash" | Out-File -FilePath publish\checksum.txt -Encoding utf8
+          Write-Host "SHA256: $hash"
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            publish/NetParity.exe
+            publish/checksum.txt
+          fail_on_unmatched_files: true
+          body: |
+            ## Download
+
+            `NetParity.exe` is self-contained and single-file. Nothing to install, no .NET
+            runtime prerequisite.
+
+            Windows may show a SmartScreen "Windows protected your PC" prompt on first run.
+            Choose **More info**, then **Run anyway**.
+
+            ## Verify your download
+
+            ```
+            Get-FileHash .\NetParity.exe -Algorithm SHA256
+            ```
+
+            ## Install and updates
+
+            Once published to the Windows Package Manager:
+
+            ```
+            winget install NetParity
+            ```

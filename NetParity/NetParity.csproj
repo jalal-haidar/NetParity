@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>NetParity</AssemblyName>
+    <RootNamespace>NetParity</RootNamespace>
+    <ApplicationIcon>Assets\NetParity.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Description>See why it lagged. CPU, RAM, network and latency in one glance.</Description>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+  </PropertyGroup>
+
+  <!--
+    Publish settings live in Properties\PublishProfiles\win-x64.pubxml rather than here.
+    Self-contained single-file output needs runtime packs that are not present on every
+    developer machine, so pinning them in the csproj would break a plain `dotnet build`.
+    Ship with:  dotnet publish NetParity\NetParity.csproj -p:PublishProfile=win-x64
+  -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\NetParity.Core\NetParity.Core.csproj" />
+  </ItemGroup>
+
+</Project>
