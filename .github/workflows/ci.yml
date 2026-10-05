@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, csharp-rewrite ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore NetParity.slnx
+
+      # TreatWarningsAsErrors is set in Directory.Build.props, so this also gates on
+      # analyzer and nullable warnings rather than just build errors.
+      - name: Build
+        run: dotnet build NetParity.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test NetParity.Tests\NetParity.Tests.csproj -c Release --no-build
+
+      # The shipping artifact is self-contained and single-file, so a download must not
+      # require a pre-installed runtime. Verify that here rather than discovering it from
+      # a bug report.
+      - name: Publish self-contained
+        run: >
+          dotnet publish NetParity\NetParity.csproj
+          -p:PublishProfile=win-x64
+          -c Release
+
+      - name: Verify artifact is self-contained and single-file
+        shell: pwsh
+        run: |
+          $expected = Join-Path $PWD 'publish\NetParity.exe'
+          if (-not (Test-Path $expected)) { throw "Expected $expected was not produced." }
+
+          $stray = Get-ChildItem publish -Filter 'NetParity*.dll' -ErrorAction SilentlyContinue
+          if ($stray) { throw "Single-file publish emitted loose assemblies: $($stray.Name -join ', ')" }
+
+          $runtimeConfig = Join-Path $PWD 'publish\NetParity.runtimeconfig.json'
+          if (Test-Path $runtimeConfig) { throw "A runtimeconfig means the artifact depends on an installed .NET runtime." }
+
+          $sizeMb = [math]::Round((Get-Item $expected).Length / 1MB, 1)
+          Write-Host "Artifact OK: NetParity.exe (${sizeMb} MB, self-contained)"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NetParity-windows-x64
+          path: publish/NetParity.exe
+          if-no-files-found: error

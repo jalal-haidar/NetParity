@@ -1,0 +1,157 @@
+﻿<Window x:Class="NetParity.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="NetParity"
+        Height="128"
+        Width="268"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        WindowStartupLocation="Manual"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal"
+        MouseLeftButtonDown="OnDrag"
+        MouseRightButtonUp="OnContextMenu"
+        MouseLeave="OnHoverEnd"
+        MouseEnter="OnHoverStart"
+        KeyDown="OnKeyDown">
+
+    <Border x:Name="Root"
+            CornerRadius="12"
+            BorderThickness="1.5"
+            Margin="6"
+            Background="#E61A1A1A"
+            BorderBrush="#33FFFFFF">
+        <Grid Margin="12,7,12,7">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Ping: the metric this app exists to surface. -->
+            <StackPanel Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="PING" Foreground="#66FFFFFF" FontSize="9" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="PingValue"
+                               Text="--"
+                               Foreground="#00FF88"
+                               FontSize="22"
+                               FontFamily="Segoe UI Semibold" />
+                    <TextBlock Text="ms"
+                               Foreground="#66FFFFFF"
+                               FontSize="10"
+                               VerticalAlignment="Bottom"
+                               Margin="2,0,0,3" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <TextBlock Text="JITTER" Foreground="#66FFFFFF" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock x:Name="JitterValue"
+                               Text="--"
+                               Foreground="#00FF88"
+                               FontSize="22"
+                               FontFamily="Segoe UI Semibold" />
+                    <TextBlock Text="ms"
+                               Foreground="#66FFFFFF"
+                               FontSize="10"
+                               VerticalAlignment="Bottom"
+                               Margin="2,0,0,3" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="DOWN" Foreground="#00F2FF" FontSize="9" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="DownloadValue"
+                               Text="0"
+                               Foreground="#00F2FF"
+                               FontSize="16"
+                               FontFamily="Segoe UI Semibold" />
+                    <TextBlock x:Name="DownloadUnit"
+                               Text="Mbps"
+                               Foreground="#66FFFFFF"
+                               FontSize="9"
+                               VerticalAlignment="Bottom"
+                               Margin="2,0,0,2" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <TextBlock Text="UP" Foreground="#FF00E5" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock x:Name="UploadValue"
+                               Text="0"
+                               Foreground="#FF00E5"
+                               FontSize="16"
+                               FontFamily="Segoe UI Semibold" />
+                    <TextBlock x:Name="UploadUnit"
+                               Text="Mbps"
+                               Foreground="#66FFFFFF"
+                               FontSize="9"
+                               VerticalAlignment="Bottom"
+                               Margin="2,0,0,2" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="CPU" Foreground="#66FFFFFF" FontSize="9" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="CpuValue"
+                               Text="0"
+                               Foreground="#00FF88"
+                               FontSize="16"
+                               FontFamily="Segoe UI Semibold" />
+                    <TextBlock Text="%"
+                               Foreground="#66FFFFFF"
+                               FontSize="9"
+                               VerticalAlignment="Bottom"
+                               Margin="1,0,0,2" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                <TextBlock Text="RAM" Foreground="#66FFFFFF" FontSize="9" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock x:Name="RamValue"
+                               Text="0"
+                               Foreground="#FFCC00"
+                               FontSize="16"
+                               FontFamily="Segoe UI Semibold" />
+                    <TextBlock Text="%"
+                               Foreground="#66FFFFFF"
+                               FontSize="9"
+                               VerticalAlignment="Bottom"
+                               Margin="1,0,0,2" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+
+    <Window.ContextMenu>
+        <ContextMenu x:Name="Menu">
+            <MenuItem x:Name="ShowLatencyItem" Header="Show ping and jitter" IsCheckable="True" Click="OnToggleLatency" />
+            <MenuItem Header="Units">
+                <MenuItem x:Name="UnitsAutoItem" Header="Auto (bits)" Click="OnUnitsAuto" />
+                <MenuItem x:Name="UnitsBitsItem" Header="Bits per second" Click="OnUnitsBits" />
+                <MenuItem x:Name="UnitsBytesItem" Header="Bytes per second" Click="OnUnitsBytes" />
+            </MenuItem>
+            <MenuItem Header="Ping target" Click="OnSetLatencyTarget" />
+            <Separator />
+            <MenuItem x:Name="StartupItem" Header="Run at startup" IsCheckable="True" Click="OnToggleStartup" />
+            <MenuItem Header="Reset position" Click="OnResetPosition" />
+            <MenuItem Header="About NetParity" Click="OnAbout" />
+            <Separator />
+            <MenuItem Header="Exit" Click="OnExit" />
+        </ContextMenu>
+    </Window.ContextMenu>
+</Window>

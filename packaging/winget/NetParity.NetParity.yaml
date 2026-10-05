@@ -1,0 +1,35 @@
+# Windows Package Manager manifest
+#
+# Submit to microsoft/winget-pkgs once a release is signed and published. Keeping this
+# file in the repo makes the submission reviewable and keeps the identity (installer
+# type, upgrade behaviour, SHA256) in one place.
+#
+# This manifest is NOT yet live. Until it is merged upstream, `winget install` will
+# report no package.
+
+PackageIdentifier: NetParity.NetParity
+PackageVersion: 2.0.0
+
+# A portable single-file exe: no installer, no registry footprint beyond the user's
+# own Run key if they opt in.
+InstallerType: portable
+NestedInstallerType: portable
+
+UpgradeBehavior: install
+
+# Required for portable packages so winget can verify the binary it downloads.
+ReleaseDate: 2026-10-05
+
+Platform:
+  - Windows
+
+MinimumOSVersion: 10.0.17763
+
+ManifestType: installer
+ManifestVersion: 1.6.0
+
+InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+
+Files:
+  - RelativeFilePath: NetParity.exe
+    PortableCommandAlias: netparity

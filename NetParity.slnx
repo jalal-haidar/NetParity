@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="NetParity.Core/NetParity.Core.csproj" />
+  <Project Path="NetParity.Tests/NetParity.Tests.csproj" />
+  <Project Path="NetParity/NetParity.csproj" />
+</Solution>
