@@ -23,9 +23,36 @@ Committed as `62235f8` "Rewrite in C# with correct metrics, latency, and a real 
 - [x] Self-contained single-file publish profile; icon; per-monitor v2 DPI manifest.
 - [x] CI that verifies the artifact is genuinely single-file and runtime-independent.
 - [x] Release workflow with optional Authenticode signing and checksum.
-- [x] 55 tests, including parity cross-checks.
+- [x] 61 tests, including parity cross-checks.
 - [x] Removed the PowerShell prototype and stale framework-dependent binary.
 - [x] Rewrote README: removed the "run the .ps1" instructions and the unshipped per-process claim.
+- [x] Merged the C# rewrite to `main` via PR #1 (squash `4bcc3b9`).
+
+### Hardening pass (post-merge review)
+
+Four defects found by reading the merged code rather than exercising it. All four read as
+correct at a glance, which is why they survived the first pass:
+
+- [x] **Latency toggle was a no-op when latency started disabled.** The sampler was built
+      conditionally in the constructor, so switching the overlay on did nothing until a
+      restart. Disabling it also did *not* stop probing, while the README claimed the probes
+      stopped. `LatencyEnabled` is now a real property that gates the probe.
+- [x] **Disposal raced an untracked probe task.** `BeginLatencyProbe` detached work with
+      `CancellationToken.None` and nothing tracked it, so `Dispose` could free the `Ping`
+      out from under a probe in flight. The task is now retained and awaited, and
+      `Start` after `Dispose` throws instead of reviving a loop on dead samplers.
+- [x] **A taken hotkey could strand the app.** The window is `WindowStyle=None` with
+      `ShowInTaskbar=False`, so if `Ctrl+Alt+N` was already owned by another application and
+      the user hid the overlay, there was no way back but Task Manager. Added a tray icon
+      (show/hide, reset position, exit) and a balloon warning when hotkey registration fails.
+      The icon needed embedding as a named resource, since `ApplicationIcon` only stamps the
+      Win32 header and leaves nothing for code to load.
+- [x] **Unit mode tore down the service on the UI thread.** Changing bits/bytes disposed and
+      rebuilt the whole service mid-session. `UnitMode` is now a property.
+
+New tests assert the behaviour rather than the absence of a crash, including a `ProbeCount`
+counter that makes "is it still sending packets when it should not be" a testable question.
+Removing the gate was confirmed to fail them, so they are not vacuous.
 
 ### Measured
 
@@ -51,18 +78,17 @@ once a second. Found by measuring, not by reading the code.
 
 1. **Sign the binary.** Obtain an Authenticode cert, add `CERT_PFX_BASE64` and `CERT_PASSWORD`
    secrets, cut a tag. Nothing else on this list matters as much; SmartScreen is the largest
-  single cause of abandoned installs.
-2. **Verify CI green on a first push** — this is the first time the single-file publish path
-   has ever executed.
-3. **Record the 15-second demo GIF.** Highest-impact marketing item. Script: saturate upload,
-  show throughput flat, show ping and jitter turn amber/red. That single clip is the pitch.
-4. **Submit the winget manifest** upstream to replace the placeholder SHA256.
-5. **Launch**: Show HN (the ICMP-to-TCP fallback is a genuine technical hook), r/gaming,
+   single cause of abandoned installs.
+2. **Record the 15-second demo GIF.** Highest-impact marketing item. Script: saturate upload,
+   show throughput flat, show ping and jitter turn amber/red. That single clip is the pitch.
+   Needs a signed build on a machine that will run it, so it lands after step 1.
+3. **Submit the winget manifest** upstream to replace the placeholder SHA256.
+4. **Launch**: Show HN (the ICMP-to-TCP fallback is a genuine technical hook), r/gaming,
    r/windows, r/programming.
-6. **Per-process network attribution** (wedge A), via `GetExtendedTcpTable`. This is the feature
+5. **Per-process network attribution** (wedge A), via `GetExtendedTcpTable`. This is the feature
    the old README promised and never had.
-7. **ISP truth-check** (wedge C) as a follow-up campaign.
-8. Lower priority: tray icon, auto-update, sparkline history, localisation.
+6. **ISP truth-check** (wedge C) as a follow-up campaign.
+7. Lower priority: auto-update, sparkline history, localisation, history graph.
 
 ---
 
@@ -190,22 +216,23 @@ Non-negotiable mechanics, roughly in order:
 ## Part 4 — Suggested sequence
 
 **Now (fix the foundation)**
-- [ ] Fix RAM% → working-set basis; CPU% → `% Processor Time`. Re-verify against Task Manager side by side.
-- [ ] Replace 3-thread fan-out with one timer; use `Dispatcher.InvokeAsync`; delete the dead timer.
-- [ ] Re-enumerate network interfaces on change; fix 1024→1000; fix or delete the RAM fallback.
-- [ ] Add tests asserting CPU/RAM/network match Task Manager within tolerance.
-- [ ] Commit the rewrite; tighten `.gitignore`.
+- [x] Fix RAM% → working-set basis; CPU% → `% Processor Time`. Re-verify against Task Manager side by side.
+- [x] Replace 3-thread fan-out with one timer; use `Dispatcher.InvokeAsync`; delete the dead timer.
+- [x] Re-enumerate network interfaces on change; fix 1024→1000; fix or delete the RAM fallback.
+- [x] Add tests asserting CPU/RAM/network match Task Manager within tolerance.
+- [x] Commit the rewrite; tighten `.gitignore`.
 
 **Then (make it installable)**
-- [ ] Self-contained single-file publish + icon + About/version.
-- [ ] GitHub Actions: build + test + auto-publish release.
+- [x] Self-contained single-file publish + icon + About/version.
+- [x] GitHub Actions: build + test + auto-publish release.
 - [ ] Signing.
-- [ ] Position persistence, settings, hotkey/tray.
-- [ ] Rewrite README; demo GIF.
-- [ ] winget manifest.
+- [x] Position persistence, settings, hotkey/tray.
+- [x] Rewrite README.
+- [ ] Record the demo GIF.
+- [x] winget manifest (staged; upstream submission still pending).
 
 **Then (differentiate)**
-- [ ] Latency/jitter/packet-loss monitor (wedge B).
+- [x] Latency/jitter/packet-loss monitor (wedge B).
 - [ ] Per-process network attribution (wedge A).
 - [ ] ISP truth-check report for shareability (wedge C).
 - [ ] Launch campaign.

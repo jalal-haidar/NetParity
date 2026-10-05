@@ -4,10 +4,11 @@
 
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-      <!-- Per-monitor v2 keeps the overlay crisp when it is dragged between a
-           1080p laptop panel and a 4K external display. -->
-      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <!--
+        DPI awareness is declared through the ApplicationHighDpiMode project property
+        instead of here. WinForms owns that manifest section and will rewrite these nodes,
+        so leaving them in place produced a WFO0003 conflict.
+      -->
       <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
     </windowsSettings>
   </application>

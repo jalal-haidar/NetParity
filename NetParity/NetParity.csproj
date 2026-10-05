@@ -3,10 +3,13 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>NetParity</AssemblyName>
     <RootNamespace>NetParity</RootNamespace>
     <ApplicationIcon>Assets\NetParity.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Keeps the overlay crisp when dragged between a 1080p panel and a 4K display. -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <Description>See why it lagged. CPU, RAM, network and latency in one glance.</Description>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <FileVersion>2.0.0.0</FileVersion>
@@ -21,6 +24,28 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NetParity.Core\NetParity.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    ApplicationIcon alone only stamps the icon into the Win32 header; it is not available
+    to code at runtime. The tray icon needs a real Icon object, so embed the file under a
+    stable logical name instead of digging it out of NetParity.g.resources.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\NetParity.ico">
+      <LogicalName>NetParity.ico</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!--
+    EnableWindowsForms pulls implicit usings for System.Windows.Forms and System.Drawing,
+    which collide with WPF types (Application, KeyEventArgs, Brush). The WinForms types
+    this project actually uses are the tray icon and are fully qualified, so the implicit
+    usings only cost ambiguity.
+  -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
 </Project>
